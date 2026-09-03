@@ -1,671 +1,188 @@
-\# API de Integração AGHU / SIGA
+# API de Integração AGHU / SIGA
 
+API PHP "vanilla" (sem framework, sem Composer) que funciona como camada intermediária **somente leitura** entre o banco de dados hospitalar (AGHU/PostgreSQL, schema `aghu_stg`) e a API principal do sistema de Ficha Anestésica **SIGA (.NET)**.
 
+A responsabilidade desta API é consultar os dados necessários no ambiente hospitalar e disponibilizá-los via endpoints REST em JSON para consumo pela API SIGA.
 
-\## Objetivo
-
-
-
-Esta API PHP tem como objetivo funcionar como uma camada intermediária entre o banco de dados hospitalar (AGHU) e a API principal do SIGA.
-
-
-
-A responsabilidade desta API é consultar os dados necessários no ambiente hospitalar e disponibilizá-los através de endpoints REST em formato JSON para consumo da API SIGA (.NET).
-
-
-
-\## Arquitetura
-
-
+## Arquitetura
 
 ```
-
 API SIGA (.NET)
-
-&#x20;       |
-
-&#x20;       | HTTP / JSON
-
-&#x20;       |
-
-API Integração PHP
-
-&#x20;       |
-
-&#x20;       | PostgreSQL
-
-&#x20;       |
-
-Banco AGHU Hospitalar
-
+       |
+       | HTTP / JSON
+       v
+API de Integração PHP  (este repositório)
+       |
+       | PDO / PostgreSQL
+       v
+Banco AGHU Hospitalar (schema aghu_stg)
 ```
 
-
-
-\---
-
-
-
-\# 1. Configuração do banco de dados
-
-
-
-Antes da execução da API, deve ser configurado o acesso ao banco de dados hospitalar.
-
-
-
-Arquivo:
-
-
+## Estrutura do projeto
 
 ```
+public/
+  index.php          Front controller: define as rotas e inicia o dispatch
+  teste-db.php        Script avulso para testar a conexão com o banco
+  .htaccess            Rewrite para Apache (ver "Pontos de atenção")
 
-/config/config.php
+api/
+  bootstrap.php        Autoload simples (sem Composer) de core/repositories/controllers/services
+  config/config.php     Configuração de banco, API e CORS (lida via variáveis de ambiente)
+  core/
+    router.php          Router minimalista (GET/POST/PUT/DELETE, parâmetros {id} via regex)
+    database.php         Conexão PDO singleton com PostgreSQL
+    response.php          Helpers de resposta JSON (ok, badRequest, unauthorized, notFound, noContent)
+  controllers/         Um controller por recurso, todos herdam de baseController
+  repositories/        Consultas SQL ao schema aghu_stg, todos herdam de baseRepository (fetchAll/fetchOne/execute/scalar)
+  services/
+    AuthService.php     Orquestra autenticação (hoje sempre libera acesso — ver abaixo)
+    LdapService.php      Bind LDAP contra o AD hospitalar (implementado, mas ainda não é chamado)
 
+Dockerfile              PHP 8.3 + Apache + pdo_pgsql, DocumentRoot apontando para /public
 ```
 
+## Requisitos
 
+* PHP 8.3+ com extensões `pdo` e `pdo_pgsql`
+* Acesso de rede ao PostgreSQL do AGHU
+* Usuário de banco **somente leitura** no schema `aghu_stg`
 
-Configuração atual de desenvolvimento:
+## Configuração
 
+Toda a configuração é feita por variáveis de ambiente, lidas em [api/config/config.php](api/config/config.php):
 
+| Variável | Descrição |
+| --- | --- |
+| `DB_HOST` | Host/IP do PostgreSQL |
+| `DB_PORT` | Porta do PostgreSQL |
+| `DB_DATABASE` | Nome do banco |
+| `DB_SCHEMA` | Schema do AGHU (hoje lido, mas ainda **não** aplicado à conexão — ver "Pontos de atenção") |
+| `DB_USERNAME` | Usuário de leitura |
+| `DB_PASSWORD` | Senha |
+
+Outras opções ficam fixas no próprio `config.php`:
 
 ```php
-
-'db' => \[
-
-&#x20;   'driver'   => 'pgsql',
-
-&#x20;   'host'     => 'localhost',
-
-&#x20;   'port'     => 5432,
-
-&#x20;   'database' => 'nextudb',
-
-&#x20;   'username' => 'postgres',
-
-&#x20;   'password' => '13676616766',
-
-&#x20;   'charset'  => 'utf8'
-
-]
-
+'api' => [
+    'basePath' => '/public',
+    'timezone' => 'America/Sao_Paulo',
+    'debug'    => true,       // desativar em produção
+],
+'cors' => [
+    'enabled' => true,
+    'origin'  => '*',         // restringir para o host da API SIGA em produção
+],
 ```
 
+## Como executar localmente
 
+Sem Docker, usando o servidor embutido do PHP (rode a partir da pasta `public`, passando `index.php` como *router script* — sem isso, rotas como `/profissionais` retornam 404):
 
-Essa configuração deve ser substituída pelos dados reais do ambiente hospitalar.
-
-
-
-Exemplo:
-
-
-
-```php
-
-'db' => \[
-
-&#x20;   'driver'   => 'pgsql',
-
-&#x20;   'host'     => 'SERVIDOR\_POSTGRES',
-
-&#x20;   'port'     => 5432,
-
-&#x20;   'database' => 'BANCO\_AGHU',
-
-&#x20;   'username' => 'USUARIO\_LEITURA',
-
-&#x20;   'password' => 'SENHA',
-
-&#x20;   'charset'  => 'utf8'
-
-]
-
+```bash
+cd public
+php -S localhost:8000 index.php
 ```
 
+Exemplo de chamada: `http://localhost:8000/profissionais`
 
+Com Docker:
 
-\## Informações necessárias
-
-
-
-O TI deverá disponibilizar:
-
-
-
-\* Host/IP do PostgreSQL;
-
-\* Porta de conexão;
-
-\* Nome do banco;
-
-\* Usuário de acesso;
-
-\* Senha;
-
-\* Schema utilizado pelo AGHU.
-
-
-
-\---
-
-
-
-\# 2. Permissões do banco
-
-
-
-O usuário utilizado pela API deve possuir apenas permissão de leitura.
-
-
-
-Necessário:
-
-
-
-\* `SELECT` nas tabelas/views utilizadas;
-
-\* acesso ao schema do AGHU.
-
-
-Não são necessárias permissões de:
-
-
-
-\* INSERT;
-
-\* UPDATE;
-
-\* DELETE;
-
-\* CREATE.
-
-
-
-A API possui comportamento somente leitura.
-
-
-
-\---
-
-
-
-\# 3. Implementação das consultas
-
-
-
-As consultas estão localizadas nos repositories:
-
-
-
+```bash
+docker build -t fa-uff-integrator .
+docker run -p 8080:80 \
+  -e DB_HOST=... -e DB_PORT=5432 -e DB_DATABASE=... \
+  -e DB_SCHEMA=aghu_stg -e DB_USERNAME=... -e DB_PASSWORD=... \
+  fa-uff-integrator
 ```
 
-/repositories
+## Endpoints
 
-```
+Todas as respostas são JSON. Erros seguem o formato `{ "message": "..." }` com o status HTTP correspondente (`400`, `401`, `404`, `500`).
 
+### `POST /auth`
 
+Autenticação de usuário.
 
-Durante o desenvolvimento foram utilizadas consultas temporárias apenas para validar conexão.
-
-
-
-Exemplo:
-
-
-
-```sql
-
-SELECT \*
-
-FROM users
-
-LIMIT 10
-
-```
-
-
-
-Essas consultas devem ser substituídas pelas consultas reais do banco AGHU.
-
-
-
-\---
-
-
-
-\# 4. Repository de profissionais
-
-
-
-Arquivo:
-
-
-
-```
-
-/repositories/profissionalRepository.php
-
-```
-
-
-
-A consulta definitiva deverá retornar os seguintes campos:
-
-
-
-| Campo         | Descrição                     |
-
-| ------------- | ----------------------------- |
-
-| id            | Identificador do profissional |
-
-| nome          | Nome completo                 |
-
-| login         | Usuário de rede               |
-
-| especialidade | Especialidade                 |
-
-| matricula     | Matrícula funcional           |
-
-| email         | Email institucional           |
-
-| setor         | Setor/unidade                 |
-
-
-
-Exemplo de retorno:
-
-
-
+Corpo:
 ```json
-
-\[
-
-&#x20;   {
-
-&#x20;       "id": 1,
-
-&#x20;       "nome": "Jonatas Silva",
-
-&#x20;       "login": "jonatas.silva",
-
-&#x20;       "especialidade": "Anestesiologia",
-
-&#x20;       "matricula": "123456",
-
-&#x20;       "email": "usuario@hospital.com",
-
-&#x20;       "setor": "Centro Cirúrgico"
-
-&#x20;   }
-
-]
-
+{ "login": "usuario", "senha": "senha" }
 ```
 
+Retorna os dados do profissional (`aghu_stg.profissionais`) em caso de sucesso, ou `401` se as credenciais forem inválidas.
 
+### `GET /profissionais`
 
-\---
+Lista os profissionais cadastrados (`aghu_stg.profissionais`).
 
+### `GET /procedimentos`
 
+Lista os procedimentos disponíveis (`aghu_stg.procedimentos`).
 
-\# 5. Endpoints disponibilizados
+### `GET /medicamentos`
 
+Lista os medicamentos ativos (`aghu_stg.medicamentos`).
 
+### `GET /cirurgias`
 
-\## Usuários
+Lista cirurgias, com paginação e filtros. Cada item já vem enriquecido com alergias do paciente e procedimentos da cirurgia.
 
+Query params:
 
+| Parâmetro | Descrição |
+| --- | --- |
+| `data` | Filtra por `data_cirurgia` |
+| `termo` | Busca por nome do paciente ou número de prontuário |
+| `status` | Filtra por status (`AGENDADA`, `EM_PREPARO`, `EM_PROGRESSO`, `CONCLUIDA`, `CANCELADA`) |
+| `page` | Página (padrão 1) |
+| `pageSize` | Itens por página (padrão 10) |
 
-Responsável por retornar dados dos usuários do sistema.
+Resultado ordenado por prioridade de status (em progresso → em preparo → agendada → concluída → cancelada), depois por data e nome.
 
+### `GET /cirurgias/por-ids`
 
+Mesma listagem acima, mas restrita a um conjunto de IDs de cirurgia.
 
-Informações esperadas:
+Query params: `ids` (lista separada por vírgula), `termo`, `status`, `page`, `pageSize`.
 
+### `GET /cirurgias/{idPaciente}/{idCirurgia}`
 
+Detalhe de uma cirurgia específica: dados do paciente, localização atual (unidade/leito/andar/quarto), alergias e procedimentos.
 
-\* Login;
+### `GET /saude`
 
-\* Nome;
+Health check. Retorna `{ "online": true|false }` conforme a conectividade com o banco.
 
-\* Matrícula;
+## Autenticação
 
-\* Email;
+`AuthService::autenticar()` hoje **sempre retorna `true`** — a validação de senha ainda não está ativa. Existe um `LdapService` já implementado (bind LDAP contra `ldap://servidor-ad`), mas ele ainda não é chamado pelo `AuthService`. Antes de ir para produção, é necessário decidir e ligar o mecanismo real de autenticação (LDAP ou outro).
 
-\* Setor;
+## Pontos de atenção
 
-\* Perfil/permissão (caso exista).
+* **`public/.htaccess` está vazio.** O `Dockerfile` habilita `mod_rewrite` e `AllowOverride All`, mas sem regras de rewrite no `.htaccess`, requisições para rotas como `/profissionais` não chegam ao `index.php` em um deploy Apache "puro" (fora do servidor embutido do PHP com router script). É necessário adicionar algo como:
+  ```apache
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^ index.php [QSA,L]
+  ```
+* **`DB_SCHEMA` não é usado na conexão.** O schema é referenciado explicitamente em cada query (`aghu_stg.tabela`), então a variável de ambiente `DB_SCHEMA` hoje não tem efeito algum — ou ela é aplicada (via `search_path` na conexão) ou pode ser removida da configuração.
+* **Sem gerenciamento de dependências (Composer).** O projeto usa um autoloader próprio (`api/bootstrap.php`), então não há `composer.json`/`vendor`. Qualquer nova dependência precisa ser avaliada quanto a essa limitação.
+* **`public/teste-db.php`** é um script de diagnóstico manual de conexão (não faz parte da API); considerar removê-lo ou restringi-lo antes de publicar em produção, já que expõe mensagens de erro de conexão publicamente.
+* **CORS liberado (`origin: '*'`)** e **`debug: true`** são adequados para desenvolvimento, mas devem ser restritos/desativados em produção.
 
+## Checklist de implantação
 
+**Banco**
+- [ ] Configurar `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
+- [ ] Confirmar que o usuário tem apenas permissão de leitura no schema `aghu_stg`
+- [ ] Validar conectividade via `GET /saude`
 
-\---
+**API PHP**
+- [ ] Resolver o rewrite do `.htaccess` (ou publicar via `php -S ... index.php`)
+- [ ] Definir e ativar o mecanismo real de autenticação (`AuthService`/`LdapService`)
+- [ ] Desativar `debug` e restringir `cors.origin` para o host da API SIGA
+- [ ] Remover ou proteger `public/teste-db.php`
 
-
-
-\## Profissionais
-
-
-
-Endpoint:
-
-
-
-```
-
-GET /profissionais
-
-```
-
-
-
-Responsável por retornar os profissionais disponíveis no hospital.
-
-
-
-\---
-
-
-
-\## Cirurgias
-
-
-
-Endpoint:
-
-
-
-```
-
-GET /cirurgias
-
-```
-
-
-
-Responsável por retornar as cirurgias programadas.
-
-
-
-Dados esperados:
-
-
-
-\* Identificação da cirurgia;
-
-\* Paciente;
-
-\* Procedimento;
-
-\* Data/hora;
-
-\* Sala;
-
-\* Equipe;
-
-\* Status.
-
-
-
-\---
-
-
-
-\# 6. Configuração da API
-
-
-
-Arquivo:
-
-
-
-```
-
-/config/config.php
-
-```
-
-
-
-Configuração:
-
-
-
-```php
-
-'api' => \[
-
-&#x20;   'basePath' => '/aghu-api/public',
-
-&#x20;   'timezone' => 'America/Sao\_Paulo',
-
-&#x20;   'debug' => true
-
-]
-
-```
-
-
-
-Em ambiente produtivo:
-
-
-
-Alterar:
-
-
-
-```php
-
-'debug' => false
-
-```
-
-
-
-\---
-
-
-
-\# 7. Publicação
-
-
-
-A API pode ser publicada utilizando:
-
-
-
-\* Apache;
-
-\* Nginx;
-
-\* Docker.
-
-\* Php somente
-
-Publicar a API somente com o PHP
-
-Dentro da pasta 'public' rodar : php -S localhost:8000 ( outra porta que precise )
-Exemplo de chamada: http://localhost:8000/profissionais
-
-
-
-
-Após publicação deverá ser disponibilizada uma URL interna.
-
-
-
-Exemplo:
-
-
-
-```
-
-http://servidor-hospital/aghu-api/public
-
-```
-
-
-
-\---
-
-
-
-\# 8. Configuração de CORS
-
-
-
-Configuração atual:
-
-
-
-```php
-
-'cors' => \[
-
-&#x20;   'enabled' => true,
-
-&#x20;   'origin' => '\*'
-
-]
-
-```
-
-
-
-Em produção recomenda-se restringir o acesso para a API SIGA.
-
-
-
-Exemplo:
-
-
-
-```php
-
-'origin' => 'http://servidor-siga'
-
-```
-
-
-
-\---
-
-
-
-\# 9. Validação da integração
-
-
-
-Após configuração devem ser realizados os testes:
-
-
-
-\## Banco
-
-
-
-\* Validar conexão PostgreSQL;
-
-\* Validar acesso ao schema AGHU;
-
-\* Validar execução das consultas.
-
-
-
-\## API
-
-
-
-Validar:
-
-
-
-\* Retorno de usuários;
-
-\* Retorno de profissionais;
-
-\* Retorno de cirurgias.
-
-
-
-\## Integração
-
-
-
-Validar consumo pela API SIGA (.NET).
-
-
-
-\---
-
-
-
-\# 10. Informações para disponibilizar à equipe SIGA
-
-
-
-Após implantação, fornecer:
-
-
-
-\* URL base da API PHP;
-
-\* Lista dos endpoints;
-
-\* Documentação dos retornos JSON;
-
-\* Ambiente de homologação;
-
-\* Usuários de teste (caso necessário).
-
-
-
-\---
-
-
-
-\# Checklist de implantação
-
-
-
-\## Banco
-
-
-
-\* \[ ] Configurar conexão PostgreSQL AGHU
-
-\* \[ ] Validar usuário de leitura
-
-\* \[ ] Validar permissões no schema
-
-
-
-\## API PHP
-
-
-
-\* \[ ] Atualizar arquivo de configuração
-
-\* \[ ] Substituir consultas temporárias
-
-\* \[ ] Implementar consultas definitivas
-
-\* \[ ] Desativar debug
-
-
-
-\## Integração SIGA
-
-
-
-\* \[ ] Disponibilizar URL da API
-
-\* \[ ] Validar endpoints
-
-\* \[ ] Validar consumo pela API .NET
-
-
-
+**Integração SIGA**
+- [ ] Disponibilizar URL base da API para a equipe SIGA
+- [ ] Validar consumo de todos os endpoints pela API .NET
