@@ -1,12 +1,12 @@
 <?php
 
-class MedicamentoController extends BaseController
+class medicamentoController extends baseController
 {
-    private MedicamentoRepository $repository;
+    private medicamentoRepository $repository;
 
     public function __construct()
     {
-        $this->repository = new MedicamentoRepository();
+        $this->repository = new medicamentoRepository();
     }
 
     public function listar(): void

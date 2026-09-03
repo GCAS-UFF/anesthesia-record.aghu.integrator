@@ -1,6 +1,6 @@
 <?php
 
-class ProfissionalRepository extends BaseRepository
+class profissionalRepository extends baseRepository
 {
     public function listar(): array
     {

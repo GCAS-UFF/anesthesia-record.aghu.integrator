@@ -1,6 +1,6 @@
 <?php
 
-class SaudeRepository extends BaseRepository
+class saudeRepository extends baseRepository
 {
     public function verificar(): bool
     {

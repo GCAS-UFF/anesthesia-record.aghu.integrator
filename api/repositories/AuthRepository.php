@@ -1,6 +1,6 @@
 <?php
 
-class AuthRepository extends BaseRepository
+class authRepository extends baseRepository
 {
     public function buscarPorLogin(string $login): ?array
     {

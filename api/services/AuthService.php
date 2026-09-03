@@ -1,14 +1,14 @@
 <?php
 
-class AuthService
+class authService
 {
-    private AuthRepository $repository;
-    private LdapService $ldap;
+    private authRepository $repository;
+    private ldapService $ldap;
 
     public function __construct()
     {
-        $this->repository = new AuthRepository();
-        $this->ldap = new LdapService();
+        $this->repository = new authRepository();
+        $this->ldap = new ldapService();
     }
 
     public function autenticar(string $login, string $senha): bool

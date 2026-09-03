@@ -1,12 +1,12 @@
 <?php
 
-class SaudeController extends BaseController
+class saudeController extends baseController
 {
-    private SaudeRepository $repository;
+    private saudeRepository $repository;
 
     public function __construct()
     {
-        $this->repository = new SaudeRepository();
+        $this->repository = new saudeRepository();
     }
 
     public function verificar(): void

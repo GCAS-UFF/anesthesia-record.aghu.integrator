@@ -1,6 +1,6 @@
 <?php
 
-class LdapService
+class ldapService
 {
     public function validar(string $login, string $senha): bool
     {

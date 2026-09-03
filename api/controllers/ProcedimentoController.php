@@ -1,12 +1,12 @@
 <?php
 
-class ProcedimentoController extends BaseController
+class procedimentoController extends baseController
 {
-    private ProcedimentoRepository $repository;
+    private procedimentoRepository $repository;
 
     public function __construct()
     {
-        $this->repository = new ProcedimentoRepository();
+        $this->repository = new procedimentoRepository();
     }
 
     public function listar(): void

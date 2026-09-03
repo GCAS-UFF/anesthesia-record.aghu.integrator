@@ -1,6 +1,6 @@
 <?php
 
-class MedicamentoRepository extends BaseRepository
+class medicamentoRepository extends baseRepository
 {
     public function listar(): array
     {

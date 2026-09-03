@@ -1,6 +1,6 @@
 <?php
 
-class Response
+class response
 {
     /**
      * Retorna uma resposta JSON.

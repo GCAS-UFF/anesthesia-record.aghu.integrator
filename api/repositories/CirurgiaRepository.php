@@ -1,6 +1,6 @@
 <?php
 
-class CirurgiaRepository extends BaseRepository
+class cirurgiaRepository extends baseRepository
 {
     public function listar(?string $data, ?string $termo, ?string $status, int $page, int $pageSize): array
 	{

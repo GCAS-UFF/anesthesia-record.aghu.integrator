@@ -1,12 +1,12 @@
 <?php
 
-class AuthController extends BaseController
+class authController extends baseController
 {
-    private AuthService $service;
+    private authService $service;
 
     public function __construct()
     {
-        $this->service = new AuthService();
+        $this->service = new authService();
     }
 
     public function login(): void

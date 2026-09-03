@@ -1,6 +1,6 @@
 <?php
 
-abstract class BaseRepository
+abstract class baseRepository
 {
     protected PDO $db;
 

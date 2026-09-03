@@ -1,24 +1,24 @@
 <?php
 
-abstract class BaseController
+abstract class baseController
 {
     protected function ok($data): void
     {
-        Response::json($data);
+        response::json($data);
     }
 
     protected function badRequest(string $message): void
     {
-        Response::badRequest($message);
+        response::badRequest($message);
     }
 
     protected function unauthorized(string $message = 'Não autorizado.'): void
     {
-        Response::unauthorized($message);
+        response::unauthorized($message);
     }
 
     protected function notFound(): void
     {
-        Response::notFound();
+        response::notFound();
     }
 }

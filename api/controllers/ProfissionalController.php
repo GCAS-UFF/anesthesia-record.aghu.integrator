@@ -1,12 +1,12 @@
 <?php
 
-class ProfissionalController extends BaseController
+class profissionalController extends baseController
 {
-    private ProfissionalRepository $repository;
+    private profissionalRepository $repository;
 
     public function __construct()
     {
-        $this->repository = new ProfissionalRepository();
+        $this->repository = new profissionalRepository();
     }
 
     /**
