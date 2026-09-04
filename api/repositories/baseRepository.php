@@ -6,7 +6,7 @@ abstract class baseRepository
 
     public function __construct()
     {
-        $this->db = Database::getConnection();
+        $this->db = database::getConnection();
     }
 
     protected function fetchAll(string $sql, array $params = []): array
