@@ -15,18 +15,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../api/bootstrap.php';
 
-$router = new Router();
+$router = new router();
 
-$router->post('/auth', [AuthController::class, 'login']);
+$router->post('/auth', [authController::class, 'login']);
 
-$router->get('/cirurgias', [CirurgiaController::class, 'listar']);
-$router->get('/cirurgias/por-ids', [CirurgiaController::class, 'listarPorIds']);
+$router->get('/cirurgias', [cirurgiaController::class, 'listar']);
+$router->get('/cirurgias/por-ids', [cirurgiaController::class, 'listarPorIds']);
 $router->get('/cirurgias/{idPaciente}/{idCirurgia}', [CirurgiaController::class, 'buscar']);
 
-$router->get('/medicamentos', [MedicamentoController::class, 'listar']);
-$router->get('/profissionais', [ProfissionalController::class, 'listar']);
-$router->get('/procedimentos', [ProcedimentoController::class, 'listar']);
+$router->get('/medicamentos', [medicamentoController::class, 'listar']);
+$router->get('/profissionais', [profissionalController::class, 'listar']);
+$router->get('/procedimentos', [procedimentoController::class, 'listar']);
 
-$router->get('/saude', [SaudeController::class, 'verificar']);
+$router->get('/saude', [saudeController::class, 'verificar']);
 
 $router->dispatch();
