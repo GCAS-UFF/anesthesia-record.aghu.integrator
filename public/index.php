@@ -27,6 +27,8 @@ $router->get('/medicamentos', [medicamentoController::class, 'listar']);
 $router->get('/profissionais', [profissionalController::class, 'listar']);
 $router->get('/procedimentos', [procedimentoController::class, 'listar']);
 
+$router->get('/exames-laboratoriais/{idPaciente}', [exameLaboratorialController::class, 'ultimo']);
+
 $router->get('/saude', [saudeController::class, 'verificar']);
 
 $router->dispatch();
